@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>符号付2バイト2進数加算</title>
+    <style>
+      body {
+        font-family: sans-serif;
+      }
+
+      .container {
+        display: flex;
+        justify-content: space-between; /* 右端を揃える */
+        align-items: flex-start; /* 上寄せ */
+        margin-bottom: 10px;
+      }
+
+      .binary-container {
+        background-color: #e0f7fa; /* 水色 */
+        padding: 10px;
+        margin-right: 10px;
+        max-width: 700px;
+        width: auto;
+        flex-grow: 1; /* 幅を自動で広げる */
+      }
+
+      .decimal-container {
+        background-color: #fff3e0; /* 薄橙 */
+        padding: 10px;
+        margin-right: 10px;
+        width: auto; /* 幅を自動調整 */
+        flex-grow: 1; /* 幅を自動で広げる */
+      }
+
+      .hex-container {
+        background-color: #e8f5e9; /* 薄緑 */
+        padding: 10px;
+        width: auto; /* 幅を自動調整 */
+        flex-grow: 1; /* 幅を自動で広げる */
+      }
+
+      table {
+        border-collapse: collapse;
+      }
+
+      td {
+        width: 30px;
+        height: 30px;
+        text-align: center;
+        border: 1px solid transparent; /* 枠線を透明に */
+      }
+
+      .binary-table {
+        width: 556px;
+      }
+
+      .hex-table {
+        width: 556px;
+      }
+
+      .decimal-table td {
+        text-align: right;
+      }
+
+      .input-button {
+        width: 100%;
+        height: 100%;
+        background-color: #4caf50;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        color: white;
+        font-size: 16px;
+      }
+
+      .set-button {
+        background-color: #4caf50; /* 緑 */
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        cursor: pointer;
+        font-size: 16px;
+        border-radius: 5px;
+        margin-bottom: 10px;
+      }
+
+      .carry {
+        color: #4caf50; /* 繰り上がりは緑 */
+        opacity: 0;
+        transition: opacity 0.3s ease-in-out;
+      }
+
+      .carry.active {
+        opacity: 1;
+      }
+
+      #carry-0 {
+        color: red;
+      }
+
+      .decimal-value {
+        text-align: right;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>2の補数を見つけよう(符号付16ビット整数)</h1>
+
+    <button id="setButton" class="set-button">セット</button>
+
+    <div class="container">
+      <div class="binary-container">
+        <h2>2進数</h2>
+        <table class="binary-table">
+          <tbody id="binaryTable"></tbody>
+        </table>
+      </div>
+
+      <div class="decimal-container">
+        <h2>10進数</h2>
+        <table class="decimal-table">
+          <tbody>
+            <tr>
+              <td></td>
+              <td style="width: 65px"></td>
+            </tr>
+            <tr>
+              <td></td>
+              <td><span id="decimalProblem" class="decimal-value"></span></td>
+            </tr>
+            <tr>
+              <td style="text-align: center">+)</td>
+              <td><span id="decimalInput" class="decimal-value"></span></td>
+            </tr>
+            <tr>
+              <td style="border-top: 2px solid black"></td>
+              <td style="border-top: 2px solid black">
+                <span id="decimalResult" class="decimal-value"></span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="hex-container">
+      <h2>16進数</h2>
+      <table class="hex-table">
+        <tbody id="hexTable">
+          <tr>
+            <td></td>
+            <td colspan="4" id="hexProblem-3"></td>
+            <td colspan="4" id="hexProblem-2"></td>
+            <td colspan="4" id="hexProblem-1"></td>
+            <td colspan="4" id="hexProblem-0"></td>
+          </tr>
+          <tr>
+            <td>+)</td>
+            <td colspan="4" id="hexInput-3"></td>
+            <td colspan="4" id="hexInput-2"></td>
+            <td colspan="4" id="hexInput-1"></td>
+            <td colspan="4" id="hexInput-0"></td>
+          </tr>
+          <tr>
+            <td style="border-top: 2px solid black"></td>
+            <td colspan="4" id="hexResult-3" style="border-top: 2px solid black"></td>
+            <td colspan="4" id="hexResult-2" style="border-top: 2px solid black"></td>
+            <td colspan="4" id="hexResult-1" style="border-top: 2px solid black"></td>
+            <td colspan="4" id="hexResult-0" style="border-top: 2px solid black"></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <script>
+      const setButton = document.getElementById("setButton");
+      const binaryTable = document.getElementById("binaryTable");
+      const decimalProblem = document.getElementById("decimalProblem");
+      const decimalInput = document.getElementById("decimalInput");
+      const decimalResult = document.getElementById("decimalResult");
+      const hexTable = document.getElementById("hexTable");
+      const hexProblem = document.getElementById("hexProblem");
+      const hexInput = document.getElementById("hexInput");
+      const hexResult = document.getElementById("hexResult");
+
+      let problemValue = 0;
+      let inputValue = 0;
+      let inputBits = new Array(15).fill(0);
+      let carryBits = new Array(16).fill(0); // 繰り上がりビット
+      let resultBits = new Array(16).fill(0);
+      let problemBits = new Array(16).fill(0);
+
+      function createTable() {
+        let tableHTML = "";
+
+        // 繰り上がり行
+        tableHTML += "<tr>";
+        for (let i = 0; i < 16; i++) {
+          tableHTML += `<td><span id="carry-${i}" class="carry"></span></td>`;
+        }
+        tableHTML += "<td></td>";
+        tableHTML += "</tr>";
+
+        // 問題行
+        tableHTML += "<tr>";
+        tableHTML += "<td></td>";
+        for (let i = 0; i < 16; i++) {
+          tableHTML += `<td id="problem-${i}"></td>`;
+        }
+        tableHTML += "</tr>";
+
+        // 入力行
+        tableHTML += "<tr>";
+        tableHTML += "<td>+)</td>"; // 記号のみ
+        tableHTML += `<td><button data-index="-1" class="input-button" style="background-color: #e0f7fa; border: none; color: black;">1</button></td>`; // 符号ビット固定
+        for (let i = 0; i < 15; i++) {
+          tableHTML += `<td><button data-index="${i}" class="input-button">0</button></td>`;
+        }
+        tableHTML += "</tr>";
+
+        // 結果行
+        tableHTML += "<tr>";
+        tableHTML += '<td style="border-top: 2px solid black;"></td>'; // 罫線を太めの黒色に
+        for (let i = 0; i < 16; i++) {
+          tableHTML += `<td id="result-${i}" style="border-top: 2px solid black;"></td>`; // 罫線を太めの黒色に
+        }
+        tableHTML += "</tr>";
+
+        binaryTable.innerHTML = tableHTML;
+
+        // イベントリスナー設定
+        const inputButtons = document.querySelectorAll(".input-button");
+        inputButtons.forEach((button) => {
+          button.addEventListener("click", function () {
+            const index = parseInt(this.dataset.index);
+            if (index >= 0) {
+              inputBits[index] = 1 - inputBits[index];
+              updateValues();
+            }
+          });
+        });
+      }
+
+      function updateValues() {
+        // 2進数入力値の計算
+        inputValue = -32768; // 最上位ビットが1なので負の最大値からスタート
+        for (let i = 0; i < 15; i++) {
+          inputValue += inputBits[i] * Math.pow(2, 14 - i);
+        }
+
+        calculateResult();
+        updateDisplay();
+      }
+
+      function calculateResult() {
+        carryBits.fill(0);
+        let carry = 0;
+
+        let a = problemBits.slice();
+        let b = [1].concat(inputBits); // 入力値をビット配列に変換
+        b = b.map(Number);
+
+        resultBits = []; // reset resultBits
+
+        // 加算と繰り上がりの計算
+        for (let i = 15; i >= 0; i--) {
+          let sum = a[i] + b[i] + carry;
+          resultBits[i] = sum % 2;
+          carry = Math.floor(sum / 2);
+          if (i < 16) {
+            carryBits[i] = carry;
+          }
+        }
+      }
+
+      function updateDisplay() {
+        // 2進数表示の更新
+        for (let i = 0; i < 16; i++) {
+          document.getElementById(`problem-${i}`).textContent = problemBits[i];
+          document.getElementById(`result-${i}`).textContent = resultBits[i];
+        }
+
+        // 繰り上がり表示の更新
+        for (let i = 0; i < 16; i++) {
+          const carryElement = document.getElementById(`carry-${i}`);
+          if (carryBits[i] === 1) {
+            if (i == 0) {
+              carryElement.textContent = "(1)"; // オーバーフロー
+            }
+            else {
+              carryElement.textContent = "1";
+            }
+            carryElement.classList.add("active");
+          } else {
+            carryElement.classList.remove("active");
+            setTimeout(() => {
+              // フェードアウト後のテキスト削除
+              carryElement.textContent = "";
+            }, 300);
+          }
+        }
+
+        const inputButtons = document.querySelectorAll(".input-button");
+        for (let i = 0; i < 15; i++) {
+          inputButtons[i + 1].textContent = inputBits[i];
+        }
+
+        // 10進数表示の更新
+        decimalProblem.textContent = problemValue;
+        decimalInput.textContent = inputValue;
+
+        decimalResult.textContent =
+          parseInt(problemValue) + parseInt(inputValue);
+
+        // 16進数表示の更新
+        const hexProblemValues = binaryToHex(problemBits).split(" ");
+        const hexInputValues = binaryToHex([1].concat(inputBits)).split(" ");
+        const hexResultValues = binaryToHex(resultBits).split(" ");
+
+        for (let i = 0; i < 4; i++) {
+          document.getElementById(`hexProblem-${3 - i}`).textContent =
+            hexProblemValues[i];
+          document.getElementById(`hexInput-${3 - i}`).textContent =
+            hexInputValues[i];
+          document.getElementById(`hexResult-${3 - i}`).textContent =
+            hexResultValues[i];
+        }
+      }
+
+      function binaryToHex(binaryArray) {
+        let hexString = "";
+        for (let i = 0; i < 4; i++) {
+          const chunk = binaryArray.slice(i * 4, (i + 1) * 4).join("");
+          hexString += parseInt(chunk, 2).toString(16).toUpperCase() + " ";
+        }
+        return hexString.trim();
+      }
+
+      function generateRandomProblem() {
+        problemValue = Math.floor(Math.random() * 32767) + 1;
+        problemBits = problemValue
+          .toString(2)
+          .padStart(16, "0")
+          .split("")
+          .map(Number);
+      }
+
+      function resetInput() {
+        inputBits = new Array(15).fill(0);
+      }
+
+      function setInitialValues() {
+        generateRandomProblem();
+        resetInput();
+        updateValues();
+      }
+
+      setButton.addEventListener("click", setInitialValues);
+      window.onload = function () {
+        createTable();
+        setInitialValues(); // 初期値を設定
+        setButton.click(); // 起動時自動クリック
+      };
+    </script>
+  </body>
+</html>
